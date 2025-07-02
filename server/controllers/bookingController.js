@@ -1,4 +1,3 @@
-import { err } from "inngest/types";
 import Show from "../models/Show.js";
 import Booking from "../models/Booking.js";
 
