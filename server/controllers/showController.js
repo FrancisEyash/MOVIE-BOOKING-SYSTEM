@@ -25,7 +25,7 @@ export const addShow = async (req, res) => {
   try {
     const { movieId, showsInput, showPrice } = req.body;
 
-    const movie = await Movie.findById(movieId);
+    let movie = await Movie.findById(movieId);
 
     if (!movie) {
       // Fetch movie details and credits from TMDB API
@@ -66,7 +66,7 @@ export const addShow = async (req, res) => {
         const dateTimeString = `${showDate}T${time}`;
         showsToCreate.push({
           movie: movieId,
-          showDate: new Date(dateTimeString),
+          showDateTime: new Date(dateTimeString),
           showPrice,
           occupiedSeats: {},
         });
@@ -78,6 +78,52 @@ export const addShow = async (req, res) => {
     }
 
     res.json({ success: true, message: "Show Added successfully." });
+  } catch (error) {
+    console.error(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// API to get all shows from the database
+export const getShows = async (req, res) => {
+  try {
+    const shows = await Show.find({ showDateTime: { $gte: new Date() } }) //get all movie shows that haven't happened yet
+      .populate("movie") //give me full movie information   // $gte: new Date() means greater than or equal to right now
+      .sort({ showDateTime: 1 }); // sort by time; put the earliest showtimes first.
+
+    // filter unique shows(get only the moveis)
+    const uniqueShows = new Set(shows.map((show) => show.movie));
+
+    res.json({ success: true, shows: Array.from(uniqueShows) });
+  } catch (error) {
+    console.error(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// API to get a single show from the database
+export const getShow = async (req, res) => {
+  try {
+    const { movieId } = req.params; // get movie id from URL
+
+    // get all upcoming shows for the movie
+    const shows = await Show.find({  // get all future showtimes for this specific movie only
+      movie: movieId,
+      showDateTime: { $gte: new Date() },
+    });
+
+    const movie = await Movie.findById(movieId); // get the movie info
+    const dateTime = {};
+
+    shows.forEach((show) => {
+      const date = show.showDateTime.toISOString().split("T")[0];
+      if (!dateTime[date]) {
+        dateTime[date] = [];
+      }
+      dateTime[date].push({ time: show.showDateTime, showId: show._id }); // group all the showtimes by date, so I can see what times are available on each day
+    });
+
+    res.json({ success: true, movie, dateTime });
   } catch (error) {
     console.error(error);
     res.json({ success: false, message: error.message });
