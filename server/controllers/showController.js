@@ -1,6 +1,7 @@
 import axios from "axios";
 import Movie from "../models/Movie.js";
 import Show from "../models/Show.js";
+import { inngest } from "../inngest/index.js";
 
 // API to get now playing movies from TMDB API
 export const getNowPlayingMovies = async (req, res) => {
@@ -33,6 +34,7 @@ export const addShow = async (req, res) => {
         axios.get(`https://api.themoviedb.org/3/movie/${movieId}`, {
           headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
         }),
+
         axios.get(`https://api.themoviedb.org/3/movie/${movieId}/credits`, {
           headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
         }),
@@ -55,6 +57,7 @@ export const addShow = async (req, res) => {
         vote_average: movieApiData.vote_average,
         runtime: movieApiData.runtime,
       };
+
       // Add movie to the database
       movie = await Movie.create(movieDetails);
     }
@@ -77,6 +80,12 @@ export const addShow = async (req, res) => {
       await Show.insertMany(showsToCreate);
     }
 
+    //  Trigger Inngest event
+    await inngest.send({
+      name: "app/show.added",
+      data: { movieTitle: movie.title },
+    });
+
     res.json({ success: true, message: "Show Added successfully." });
   } catch (error) {
     console.error(error);
@@ -87,11 +96,11 @@ export const addShow = async (req, res) => {
 // API to get all shows from the database
 export const getShows = async (req, res) => {
   try {
-    const shows = await Show.find({ showDateTime: { $gte: new Date() } }) //get all movie shows that haven't happened yet
-      .populate("movie") //give me full movie information   // $gte: new Date() means greater than or equal to right now
-      .sort({ showDateTime: 1 }); // sort by time; put the earliest showtimes first.
+    const shows = await Show.find({ showDateTime: { $gte: new Date() } })
+      .populate("movie")
+      .sort({ showDateTime: 1 });
 
-    // filter unique shows(get only the moveis)
+    // filter unique shows
     const uniqueShows = new Set(shows.map((show) => show.movie));
 
     res.json({ success: true, shows: Array.from(uniqueShows) });
@@ -104,15 +113,14 @@ export const getShows = async (req, res) => {
 // API to get a single show from the database
 export const getShow = async (req, res) => {
   try {
-    const { movieId } = req.params; // get movie id from URL
-
+    const { movieId } = req.params;
     // get all upcoming shows for the movie
-    const shows = await Show.find({  // get all future showtimes for this specific movie only
+    const shows = await Show.find({
       movie: movieId,
       showDateTime: { $gte: new Date() },
     });
 
-    const movie = await Movie.findById(movieId); // get the movie info
+    const movie = await Movie.findById(movieId);
     const dateTime = {};
 
     shows.forEach((show) => {
@@ -120,7 +128,7 @@ export const getShow = async (req, res) => {
       if (!dateTime[date]) {
         dateTime[date] = [];
       }
-      dateTime[date].push({ time: show.showDateTime, showId: show._id }); // group all the showtimes by date, so I can see what times are available on each day
+      dateTime[date].push({ time: show.showDateTime, showId: show._id });
     });
 
     res.json({ success: true, movie, dateTime });

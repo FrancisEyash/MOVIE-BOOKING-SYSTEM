@@ -1,5 +1,6 @@
 import Booking from "../models/Booking.js";
 import Show from "../models/Show.js";
+import User from "../models/User.js";
 
 // API to check if user is admin
 export const isAdmin = async (req, res) => {
@@ -25,7 +26,7 @@ export const getDashboardData = async (req, res) => {
 
     res.json({ success: true, dashboardData });
   } catch (error) {
-    console.log(error.message);
+    console.error(error);
     res.json({ success: false, message: error.message });
   }
 };
@@ -38,7 +39,7 @@ export const getAllShows = async (req, res) => {
       .sort({ showDateTime: 1 });
     res.json({ success: true, shows });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.json({ success: false, message: error.message });
   }
 };
@@ -53,7 +54,6 @@ export const getAllBookings = async (req, res) => {
         populate: { path: "movie" },
       })
       .sort({ createdAt: -1 });
-
     res.json({ success: true, bookings });
   } catch (error) {
     console.error(error);
